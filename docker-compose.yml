@@ -1,0 +1,15 @@
+services:
+  toodizzle:
+    build: ./app
+    container_name: toodizzle
+    expose:
+      - "80"
+    volumes:
+      - /home/jesse/docker/toodizzle/data:/data
+    networks:
+      - localweb
+    restart: unless-stopped
+
+networks:
+  localweb:
+    external: true

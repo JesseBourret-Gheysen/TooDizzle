@@ -1,0 +1,4 @@
+flask==3.1.0
+gunicorn==23.0.0
+markupsafe==3.0.2
+markdown==3.7

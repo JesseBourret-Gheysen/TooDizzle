@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TooDizzle — Tasks</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#253356">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:          #253356;
+      --bg-deep:     #1a2540;
+      --surface:     #f5f8ff;
+      --border:      #ccd4e8;
+      --text-light:  #e0eaf8;
+      --text-dark:   #1a2540;
+      --muted-light: rgba(224, 234, 248, 0.6);
+      --muted-dark:  #6a7a9a;
+      --btn:         #2d63aa;
+      --btn-h:       #1e4e8a;
+      --focus-ring:  rgba(45, 99, 170, 0.22);
+      --row-hover:   #eef2fb;
+      --divider:     #dce5f2;
+      --accent:      rgba(45, 99, 170, 0.12);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(45, 99, 170, 0.35) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 90% 90%, rgba(26, 37, 64, 0.6) 0%, transparent 60%);
+      color: var(--text-light);
+      min-height: 100vh;
+      padding: 2.5rem 1.25rem 5rem;
+    }
+
+    .wrap { max-width: 1040px; margin: 0 auto; }
+
+    /* ── Nav ─────────────────────────────────────────────────────────── */
+    nav { display: flex; gap: 0.375rem; margin-bottom: 2.5rem; }
+    .nav-btn {
+      display: inline-block;
+      padding: 0.38rem 1.05rem;
+      border-radius: 999px;
+      font-size: 0.775rem;
+      font-weight: 500;
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      border: 1.5px solid rgba(224, 234, 248, 0.2);
+      color: var(--muted-light);
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-light); border-color: rgba(224,234,248,0.35); }
+    .nav-btn.active { background: rgba(255,255,255,0.15); border-color: rgba(224,234,248,0.55); color: var(--text-light); font-weight: 600; }
+
+    /* ── Header ──────────────────────────────────────────────────────── */
+    header { margin-bottom: 1.75rem; }
+    header h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.1rem; font-weight: 700;
+      color: var(--text-light); line-height: 1.15; letter-spacing: -0.01em;
+    }
+    #task-count { color: var(--muted-light); font-size: 0.82rem; margin-top: 0.45rem; letter-spacing: 0.01em; }
+
+    /* ── Filter bar ──────────────────────────────────────────────────── */
+    .filter-bar {
+      display: flex; flex-direction: column; gap: 0; margin-bottom: 1.5rem;
+      background: rgba(255,255,255,0.055); border: 1px solid rgba(224,234,248,0.1);
+      border-radius: 14px; padding: 0.85rem 1.1rem;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .filter-group { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; padding: 0.35rem 0; }
+    .filter-group + .filter-group { border-top: 1px solid rgba(224,234,248,0.08); }
+    .filter-label { font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(224,234,248,0.45); min-width: 3.4rem; flex-shrink: 0; }
+    .pill {
+      display: inline-block; padding: 0.24rem 0.72rem; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 500; cursor: pointer;
+      border: 1px solid rgba(224,234,248,0.18); color: rgba(224,234,248,0.7);
+      background: transparent; transition: background 0.12s, border-color 0.12s, color 0.12s;
+      user-select: none; letter-spacing: 0.01em;
+    }
+    .pill:hover { background: rgba(255,255,255,0.1); color: var(--text-light); border-color: rgba(224,234,248,0.35); }
+    .pill.active { background: rgba(255,255,255,0.18); border-color: rgba(224,234,248,0.65); color: var(--text-light); font-weight: 600; }
+
+    /* ── Card ────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 0;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.04) inset;
+      overflow: hidden;
+    }
+
+    /* ── Table (desktop) ─────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.845rem; }
+    thead { background: #f0f4fc; }
+    th {
+      text-align: left; padding: 0.7rem 0.9rem;
+      font-size: 0.625rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--muted-dark); border-bottom: 1.5px solid var(--border); white-space: nowrap;
+    }
+    th.sortable { cursor: pointer; }
+    th.sortable:hover { color: var(--btn); }
+    th.sorted { color: var(--btn); }
+    th .sort-arrow { margin-left: 3px; font-size: 0.65rem; }
+    td {
+      padding: 0.875rem 0.9rem; border-bottom: 1px solid var(--divider);
+      vertical-align: top; color: var(--text-dark); transition: background 0.1s;
+    }
+    tr:hover td { background: var(--row-hover); }
+    tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--btn); }
+    tr:last-child td { border-bottom: none; }
+
+    /* Done row */
+    tr.is-done td { opacity: 0.45; }
+    tr.is-done .task-preview { text-decoration: line-through; }
+
+    /* Task expand/collapse (desktop) */
+    .task-preview  { display: block; cursor: pointer; line-height: 1.55; }
+    .expand-hint   { color: var(--muted-dark); font-size: 0.73rem; margin-left: 0.3em; user-select: none; opacity: 0.7; }
+    .task-expanded { display: none; cursor: pointer; line-height: 1.65; padding-top: 0.3rem; }
+    td.col-task.is-expanded .task-preview  { display: none; }
+    td.col-task.is-expanded .task-expanded { display: block; animation: expand-in 0.18s ease; }
+    @keyframes expand-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .task-expanded p  { margin-bottom: 0.5rem; }
+    .task-expanded ul, .task-expanded ol { margin: 0.4rem 0 0.5rem 1.25rem; }
+    .task-expanded li { margin-bottom: 0.2rem; }
+    .task-expanded a  { color: var(--btn); text-decoration: underline; word-break: break-all; }
+    .task-expanded code { background: #eef2fb; border-radius: 3px; padding: 0.1em 0.35em; font-size: 0.82em; }
+    .collapse-hint { display: block; color: var(--muted-dark); font-size: 0.7rem; margin-top: 0.55rem; user-select: none; opacity: 0.65; }
+
+    /* ── Custom checkbox ─────────────────────────────────────────────── */
+    .col-done-cell { width: 2.5rem; text-align: center; }
+    .done-toggle {
+      appearance: none; -webkit-appearance: none;
+      width: 17px; height: 17px; border: 1.5px solid #b8c8e0; border-radius: 5px;
+      background: white; cursor: pointer; flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+      position: relative; display: block; margin: 0 auto;
+    }
+    .done-toggle:hover { border-color: var(--btn); box-shadow: 0 0 0 3px var(--focus-ring); }
+    .done-toggle:checked { background: var(--btn); border-color: var(--btn); }
+    .done-toggle:checked::after {
+      content: ''; position: absolute; left: 4px; top: 1px; width: 5px; height: 9px;
+      border: 2px solid white; border-top: none; border-left: none; transform: rotate(45deg);
+    }
+
+    /* ── Badges ──────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block; padding: 0.18rem 0.58rem; border-radius: 999px;
+      font-size: 0.67rem; font-weight: 600; white-space: nowrap; letter-spacing: 0.02em;
+    }
+    .type-tech      { background: #ddeef8; color: #1d5a8a; border: 1px solid #b8d9ef; }
+    .type-biohealth { background: #d4edda; color: #1e5c30; border: 1px solid #a8d4b4; }
+    .type-exercise  { background: #f5eacf; color: #7a5a1e; border: 1px solid #e0cf9e; }
+    .type-other     { background: #e8e4f0; color: #4a3a6a; border: 1px solid #c8c0d8; }
+    .type-music     { background: #f0e4f8; color: #6b3a8a; border: 1px solid #d4b8eb; }
+    .type-art       { background: #fde8d0; color: #8a4a1a; border: 1px solid #f0c89a; }
+    .type-events    { background: #d0eeec; color: #1a6b68; border: 1px solid #a0d8d4; }
+    .subtype-badge  { background: #eef2fb; color: #4a6090; border: 1px solid #c8d4e8; font-size: 0.62rem; padding: 0.14rem 0.48rem; margin-left: 0.28rem; }
+
+    /* ── Links ───────────────────────────────────────────────────────── */
+    .task-link  { color: var(--btn); text-decoration: underline; word-break: break-all; }
+    .source-link { color: var(--btn); text-decoration: none; font-size: 0.78rem; font-weight: 500; }
+    .source-link:hover { text-decoration: underline; }
+
+    /* ── Empty ───────────────────────────────────────────────────────── */
+    .empty { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 3.5rem 2rem; color: var(--muted-dark); font-size: 0.9rem; text-align: center; }
+    .empty-icon { font-size: 2rem; opacity: 0.4; }
+
+    /* ── Actions column ─────────────────────────────────────────────── */
+    .col-actions { width: 2.5rem; text-align: center; }
+    .actions-wrap { position: relative; display: inline-block; }
+    .actions-btn { background: none; border: none; color: var(--muted-dark); font-size: 1.1rem; cursor: pointer; padding: 0.15rem 0.5rem; border-radius: 6px; line-height: 1; transition: background 0.12s, color 0.12s; }
+    .actions-btn:hover { background: var(--divider); color: var(--text-dark); }
+
+    /* ── Dropdown menu ───────────────────────────────────────────────── */
+    .actions-menu {
+      display: none; position: absolute; right: 0; top: calc(100% + 4px);
+      background: white; border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.13), 0 1px 4px rgba(0,0,0,0.08);
+      min-width: 130px; z-index: 100; overflow: hidden;
+    }
+    .actions-menu.open { display: block; }
+    .menu-item { display: block; width: 100%; text-align: left; padding: 0.55rem 1rem; background: none; border: none; font-size: 0.835rem; font-family: 'DM Sans', system-ui, sans-serif; color: var(--text-dark); cursor: pointer; letter-spacing: 0.01em; transition: background 0.1s; }
+    .menu-item:hover { background: var(--row-hover); }
+    .menu-danger { color: #c0392b; }
+    .menu-danger:hover { background: #fdf0f0; }
+
+    /* Ensure [hidden] attribute wins over any display rule in this stylesheet */
+    [hidden] { display: none !important; }
+
+    /* ── Modals (shared backdrop) ────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15, 22, 48, 0.55);
+      backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+      display: flex; align-items: center; justify-content: center; z-index: 200; overflow: hidden;
+    }
+    /* Mobile detail: sheet slides up from bottom */
+    .modal-backdrop.sheet-backdrop { align-items: flex-end; background: rgba(10, 15, 40, 0.65); }
+
+    /* ── Edit modal ──────────────────────────────────────────────────── */
+    .modal {
+      background: var(--surface); border-radius: 18px; padding: 1.75rem;
+      width: min(520px, 92vw);
+      box-shadow: 0 16px 56px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.12);
+      border: 1px solid rgba(204,212,232,0.6);
+    }
+    .modal h3 {
+      font-family: 'Playfair Display', Georgia, serif; font-size: 1.1rem; font-weight: 700;
+      color: var(--text-dark); margin-bottom: 1.1rem; letter-spacing: -0.01em;
+    }
+    .modal-field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.8rem; }
+    .modal-field label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-dark); }
+    .modal textarea, .modal select {
+      background: white; border: 1.5px solid var(--border); border-radius: 9px;
+      color: var(--text-dark); padding: 0.6rem 0.8rem; font-size: 0.875rem;
+      font-family: 'DM Sans', system-ui, sans-serif; outline: none; width: 100%;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .modal textarea { resize: vertical; min-height: 90px; line-height: 1.55; }
+    .modal textarea:focus, .modal select:focus { border-color: var(--btn); box-shadow: 0 0 0 3px var(--focus-ring); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.1rem; }
+
+    /* ── Sheet modal (mobile task detail) ────────────────────────────── */
+    .sheet-modal {
+      background: var(--surface); border-radius: 22px 22px 0 0;
+      padding: 1.25rem 1.5rem 2rem; width: 100%; max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: 0 -8px 40px rgba(0,0,0,0.3);
+      animation: slide-up-sheet 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @keyframes slide-up-sheet {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+    .sheet-handle {
+      width: 36px; height: 4px; background: var(--border); border-radius: 2px;
+      margin: 0 auto 1.2rem; display: block;
+    }
+    .sheet-topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
+    .sheet-topbar-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .sheet-close-btn {
+      background: var(--row-hover); border: none; border-radius: 50%;
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 0.9rem; color: var(--muted-dark); flex-shrink: 0;
+      transition: background 0.12s;
+    }
+    .sheet-close-btn:hover { background: var(--divider); }
+    .sheet-content {
+      font-size: 0.9rem; line-height: 1.65; color: var(--text-dark);
+      padding: 0.75rem 0; border-top: 1px solid var(--divider);
+    }
+    .sheet-content p  { margin-bottom: 0.55rem; }
+    .sheet-content ul, .sheet-content ol { margin: 0.4rem 0 0.55rem 1.25rem; }
+    .sheet-content li { margin-bottom: 0.2rem; }
+    .sheet-content a  { color: var(--btn); text-decoration: underline; word-break: break-all; }
+    .sheet-content code { background: #eef2fb; border-radius: 3px; padding: 0.1em 0.35em; font-size: 0.82em; }
+    .sheet-meta { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0; border-top: 1px solid var(--divider); font-size: 0.8rem; color: var(--muted-dark); flex-wrap: wrap; }
+    .sheet-meta .source-link { font-size: 0.8rem; }
+    .sheet-done-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 0; border-top: 1px solid var(--divider); }
+    .sheet-done-label { font-size: 0.875rem; font-weight: 500; color: var(--text-dark); cursor: pointer; user-select: none; }
+    .sheet-actions { display: flex; gap: 0.6rem; margin-top: 0.75rem; border-top: 1px solid var(--divider); padding-top: 1rem; }
+    .sheet-actions .btn-danger { background: transparent; color: #c0392b; border: 1.5px solid #e8b4b4; border-radius: 8px; padding: 0.575rem 1.1rem; font-size: 0.84rem; font-weight: 600; cursor: pointer; font-family: 'DM Sans', system-ui, sans-serif; transition: background 0.12s; }
+    .sheet-actions .btn-danger:hover { background: #fdf0f0; }
+
+    /* ── Shared button styles ────────────────────────────────────────── */
+    .btn-secondary {
+      background: transparent; color: var(--muted-dark); border: 1.5px solid var(--border);
+      border-radius: 8px; padding: 0.575rem 1.25rem; font-size: 0.84rem; font-weight: 600;
+      cursor: pointer; font-family: 'DM Sans', system-ui, sans-serif; letter-spacing: 0.01em;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .btn-secondary:hover { background: var(--row-hover); border-color: #b0bcd4; }
+    .btn-primary {
+      background: var(--btn); color: #fff; border: none; border-radius: 8px;
+      padding: 0.575rem 1.4rem; font-size: 0.84rem; font-weight: 600; cursor: pointer;
+      font-family: 'DM Sans', system-ui, sans-serif; letter-spacing: 0.02em;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary:hover { background: var(--btn-h); box-shadow: 0 2px 8px rgba(45,99,170,0.35); }
+
+    /* ── Date cell ───────────────────────────────────────────────────── */
+    .date-cell { white-space: nowrap; font-size: 0.78rem; color: var(--muted-dark); font-variant-numeric: tabular-nums; }
+
+    /* ── Mobile card list ────────────────────────────────────────────── */
+    .mobile-list { display: none; }
+    .mobile-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.9rem 1rem; border-bottom: 1px solid var(--divider);
+      cursor: pointer; transition: background 0.1s;
+    }
+    .mobile-item:last-child { border-bottom: none; }
+    .mobile-item:active { background: var(--row-hover); }
+    .mobile-item.is-done { opacity: 0.45; }
+    .mobile-item.is-done .mobile-item-text { text-decoration: line-through; }
+    .mobile-item-body { flex: 1; min-width: 0; }
+    .mobile-item-text { font-size: 0.875rem; color: var(--text-dark); line-height: 1.45; margin-bottom: 0.35rem; }
+    .mobile-item-meta { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+    .mobile-date { font-size: 0.72rem; color: var(--muted-dark); margin-left: auto; white-space: nowrap; }
+    .mobile-arrow { color: var(--muted-dark); font-size: 1.1rem; flex-shrink: 0; opacity: 0.5; }
+
+    /* ── Responsive ──────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      body { padding: 1.75rem 0.9rem 4rem; }
+      header h1 { font-size: 1.65rem; }
+      .filter-bar { padding: 0.65rem 0.85rem; }
+      .table-wrap { display: none; }
+      .mobile-list { display: block; }
+      .col-source { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <a href="/" class="nav-btn">Add Task</a>
+    <a href="/tasks" class="nav-btn active">View Tasks</a>
+  </nav>
+
+  <header>
+    <h1>Tasks</h1>
+    <p id="task-count"></p>
+  </header>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Type</span>
+      <button class="pill active" data-type-filter="all">All</button>
+      <button class="pill" data-type-filter="Tech">Tech</button>
+      <button class="pill" data-type-filter="Bio/Health">Bio/Health</button>
+      <button class="pill" data-type-filter="Exercise">Exercise</button>
+      <button class="pill" data-type-filter="Music">Music</button>
+      <button class="pill" data-type-filter="Art">Art</button>
+      <button class="pill" data-type-filter="Events">Events</button>
+      <button class="pill" data-type-filter="Other">Other</button>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Status</span>
+      <button class="pill" data-status-filter="all">All</button>
+      <button class="pill active" data-status-filter="active">Active</button>
+      <button class="pill" data-status-filter="done">Done</button>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Sort</span>
+      <button class="pill active" data-sort="newest">Newest</button>
+      <button class="pill" data-sort="oldest">Oldest</button>
+    </div>
+  </div>
+
+  {% set type_cls = {'Tech': 'tech', 'Bio/Health': 'biohealth', 'Exercise': 'exercise', 'Other': 'other', 'Music': 'music', 'Art': 'art', 'Events': 'events'} %}
+
+  {% if todos %}
+  <div class="card">
+    <!-- Desktop table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-done-cell" title="Mark complete">Done</th>
+            <th>Task</th>
+            <th>Type</th>
+            <th class="col-source">Source</th>
+            <th>Date</th>
+            <th class="col-actions" aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for todo in todos %}
+          <tr
+            data-type="{{ todo.type }}"
+            data-done="{{ todo.done }}"
+            data-date="{{ todo.date_added }}"
+            data-text="{{ todo.text }}"
+            data-subtype="{{ todo.subtype }}"
+            class="{{ 'is-done' if todo.done == 'yes' else '' }}"
+          >
+            <td class="col-done-cell">
+              <input type="checkbox" class="done-toggle" data-id="{{ todo.id }}" {{ 'checked' if todo.done == 'yes' else '' }}>
+            </td>
+            <td class="col-task" onclick="toggleExpand(this)">
+              <span class="task-preview">
+                {{ todo.text_preview | e }}{% if todo.text_truncated %}&hellip;<span class="expand-hint">&#x2935;</span>{% endif %}
+              </span>
+              <div class="task-expanded">
+                {{ todo.text_html }}
+                <span class="collapse-hint">&#x2934; click to collapse</span>
+              </div>
+            </td>
+            <td>
+              <span class="badge type-{{ type_cls.get(todo.type, 'other') }}">{{ todo.type }}</span>
+              {% if todo.subtype %}<span class="badge subtype-badge">{{ todo.subtype }}</span>{% endif %}
+            </td>
+            <td class="col-source">
+              {% if todo.source %}
+              <a href="{{ todo.source }}" target="_blank" rel="noopener noreferrer" class="source-link">{{ todo.display_source }}</a>
+              {% else %}<span style="color:var(--muted-dark);font-size:0.8rem">—</span>{% endif %}
+            </td>
+            <td class="date-cell">{{ todo.date_added }}</td>
+            <td class="col-actions">
+              <div class="actions-wrap">
+                <button class="actions-btn" data-id="{{ todo.id }}" aria-label="Actions">…</button>
+                <div class="actions-menu" id="menu-{{ todo.id }}">
+                  <button class="menu-item" data-action="edit"      data-id="{{ todo.id }}">Edit</button>
+                  <button class="menu-item" data-action="duplicate" data-id="{{ todo.id }}">Duplicate</button>
+                  <button class="menu-item menu-danger" data-action="delete" data-id="{{ todo.id }}">Delete</button>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile card list -->
+    <div class="mobile-list">
+      {% for todo in todos %}
+      <div class="mobile-item {{ 'is-done' if todo.done == 'yes' else '' }}"
+           data-type="{{ todo.type }}"
+           data-done="{{ todo.done }}"
+           data-date="{{ todo.date_added }}"
+           data-id="{{ todo.id }}"
+           onclick="openMobileDetail('{{ todo.id }}')">
+        <div class="mobile-item-body">
+          <div class="mobile-item-text">{{ todo.text_preview | e }}{% if todo.text_truncated %}…{% endif %}</div>
+          <div class="mobile-item-meta">
+            <span class="badge type-{{ type_cls.get(todo.type, 'other') }}">{{ todo.type }}</span>
+            {% if todo.subtype %}<span class="badge subtype-badge">{{ todo.subtype }}</span>{% endif %}
+            <span class="mobile-date">{{ todo.date_added }}</span>
+          </div>
+        </div>
+        <div class="mobile-arrow">›</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% else %}
+  <div class="card">
+    <div class="empty">
+      <div class="empty-icon">✦</div>
+      No tasks yet — <a href="/" style="color:var(--btn);font-weight:500">add one</a>.
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Edit modal -->
+<div id="edit-modal" class="modal-backdrop" hidden>
+  <div class="modal">
+    <h3>Edit Task</h3>
+    <div class="modal-field">
+      <label for="edit-text">Task</label>
+      <textarea id="edit-text"></textarea>
+    </div>
+    <div class="modal-field">
+      <label for="edit-type">Type</label>
+      <select id="edit-type">
+        <option value="Tech">Tech</option>
+        <option value="Bio/Health">Bio/Health</option>
+        <option value="Exercise">Exercise</option>
+        <option value="Music">Music</option>
+        <option value="Art">Art</option>
+        <option value="Events">Events</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="modal-field" id="edit-subtype-field">
+      <label for="edit-subtype">Subtype</label>
+      <select id="edit-subtype">
+        <option value="Other">Other</option>
+        <option value="AI">AI</option>
+        <option value="Hardware">Hardware</option>
+        <option value="Creative">Creative</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="edit-cancel">Cancel</button>
+      <button class="btn-primary"   id="edit-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile detail sheet -->
+<div id="mobile-detail-modal" class="modal-backdrop sheet-backdrop" hidden>
+  <div class="sheet-modal">
+    <span class="sheet-handle"></span>
+    <div class="sheet-topbar">
+      <div class="sheet-topbar-badges" id="mmd-badges"></div>
+      <button class="sheet-close-btn" id="mmd-close">✕</button>
+    </div>
+    <div class="sheet-content" id="mmd-content"></div>
+    <div class="sheet-meta" id="mmd-meta"></div>
+    <div class="sheet-done-row">
+      <input type="checkbox" class="done-toggle" id="mmd-done-cb" style="margin:0">
+      <label class="sheet-done-label" for="mmd-done-cb">Mark as done</label>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-danger" id="mmd-delete">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn-secondary" id="mmd-close2">Cancel</button>
+      <button class="btn-primary"   id="mmd-edit">Edit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Task data for mobile detail ───────────────────────────────────────
+  const TASK_DATA = {
+    {% for todo in todos %}
+    {{ todo.id | tojson }}: {
+      textHtml:      {{ todo.text_html | tojson }},
+      textPreview:   {{ todo.text_preview | tojson }},
+      text:          {{ todo.text | tojson }},
+      type:          {{ todo.type | tojson }},
+      subtype:       {{ todo.subtype | tojson }},
+      date:          {{ todo.date_added | tojson }},
+      source:        {{ todo.source | tojson }},
+      displaySource: {{ todo.display_source | tojson }},
+      done:          {{ todo.done | tojson }},
+      typeCls:       {{ type_cls.get(todo.type, 'other') | tojson }},
+    },
+    {% endfor %}
+  };
+
+  // ── Desktop expand/collapse ───────────────────────────────────────────
+  function toggleExpand(td) { td.classList.toggle('is-expanded'); }
+  document.addEventListener('click', e => {
+    if (e.target.closest('.task-expanded a')) e.stopPropagation();
+  }, true);
+
+  // ── Filter / sort state ───────────────────────────────────────────────
+  const allRows        = Array.from(document.querySelectorAll('tbody tr'));
+  const allMobileItems = Array.from(document.querySelectorAll('.mobile-item'));
+  let activeType   = 'all';
+  let activeStatus = 'active';
+  let sortOrder    = 'newest';
+
+  function updateCount() {
+    const visible = allRows.filter(r => r.style.display !== 'none');
+    const active  = visible.filter(r => r.dataset.done !== 'yes').length;
+    const el = document.getElementById('task-count');
+    if (el) el.textContent = `${visible.length} shown · ${active} active`;
+  }
+
+  function applyFilters() {
+    [allRows, allMobileItems].forEach(list => {
+      list.forEach(el => {
+        const typeMatch   = activeType === 'all' || el.dataset.type === activeType;
+        const statusMatch = activeStatus === 'all'
+          || (activeStatus === 'active' && el.dataset.done !== 'yes')
+          || (activeStatus === 'done'   && el.dataset.done === 'yes');
+        el.style.display = (typeMatch && statusMatch) ? '' : 'none';
+      });
+    });
+    updateCount();
+  }
+
+  function applySort() {
+    const tbody = document.querySelector('tbody');
+    if (tbody) {
+      [...allRows].sort((a, b) => {
+        const cmp = a.dataset.date.localeCompare(b.dataset.date);
+        return sortOrder === 'newest' ? -cmp : cmp;
+      }).forEach(r => tbody.appendChild(r));
+    }
+    const mobileList = document.querySelector('.mobile-list');
+    if (mobileList) {
+      [...allMobileItems].sort((a, b) => {
+        const cmp = a.dataset.date.localeCompare(b.dataset.date);
+        return sortOrder === 'newest' ? -cmp : cmp;
+      }).forEach(i => mobileList.appendChild(i));
+    }
+  }
+
+  // Type filter
+  document.querySelectorAll('[data-type-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeType = btn.dataset.typeFilter;
+      document.querySelectorAll('[data-type-filter]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFilters();
+    });
+  });
+
+  // Status filter
+  document.querySelectorAll('[data-status-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeStatus = btn.dataset.statusFilter;
+      document.querySelectorAll('[data-status-filter]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFilters();
+    });
+  });
+
+  // Sort
+  document.querySelectorAll('[data-sort]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sortOrder = btn.dataset.sort;
+      document.querySelectorAll('[data-sort]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applySort();
+      applyFilters();
+    });
+  });
+
+  // Done toggle (desktop table checkboxes)
+  document.querySelectorAll('tbody .done-toggle').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const id  = cb.dataset.id;
+      const row = cb.closest('tr');
+      try {
+        await fetch(`/done/${id}`, { method: 'POST' });
+        const isDone = cb.checked;
+        row.dataset.done = isDone ? 'yes' : '';
+        row.classList.toggle('is-done', isDone);
+        syncMobileItemDone(id, isDone);
+        applyFilters();
+      } catch { cb.checked = !cb.checked; }
+    });
+  });
+
+  // Sync helper: update mobile item done state
+  function syncMobileItemDone(id, isDone) {
+    const item = document.querySelector(`.mobile-item[data-id="${id}"]`);
+    if (item) {
+      item.dataset.done = isDone ? 'yes' : '';
+      item.classList.toggle('is-done', isDone);
+    }
+    if (TASK_DATA[id]) TASK_DATA[id].done = isDone ? 'yes' : '';
+  }
+
+  // Sync helper: update table row done state
+  function syncTableRowDone(id, isDone) {
+    const row = allRows.find(r => r.querySelector(`.done-toggle[data-id="${id}"]`));
+    if (row) {
+      row.dataset.done = isDone ? 'yes' : '';
+      row.classList.toggle('is-done', isDone);
+      const cb = row.querySelector(`.done-toggle[data-id="${id}"]`);
+      if (cb) cb.checked = isDone;
+    }
+  }
+
+  // Init
+  applySort();
+  applyFilters();
+
+  // ── Dropdown menus ────────────────────────────────────────────────────
+  function closeAllMenus() {
+    document.querySelectorAll('.actions-menu.open').forEach(m => m.classList.remove('open'));
+  }
+  document.querySelectorAll('.actions-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const menu = document.getElementById('menu-' + btn.dataset.id);
+      const isOpen = menu.classList.contains('open');
+      closeAllMenus();
+      if (!isOpen) menu.classList.add('open');
+    });
+  });
+  document.addEventListener('click', closeAllMenus);
+
+  // ── Edit modal ────────────────────────────────────────────────────────
+  const modal            = document.getElementById('edit-modal');
+  const editText         = document.getElementById('edit-text');
+  const editType         = document.getElementById('edit-type');
+  const editSubtype      = document.getElementById('edit-subtype');
+  const editSubtypeField = document.getElementById('edit-subtype-field');
+  let   activeEditId     = null;
+
+  function updateEditSubtype() {
+    const isTech = editType.value === 'Tech';
+    editSubtypeField.style.display = isTech ? '' : 'none';
+    if (!isTech) editSubtype.value = 'Other';
+  }
+  editType.addEventListener('change', updateEditSubtype);
+
+  function openEditModal(id, text, type, subtype) {
+    activeEditId      = id;
+    editText.value    = text;
+    editType.value    = type;
+    editSubtype.value = subtype || 'Other';
+    updateEditSubtype();
+    modal.hidden      = false;
+    editText.focus();
+  }
+  function closeEditModal() { modal.hidden = true; activeEditId = null; }
+
+  document.getElementById('edit-cancel').addEventListener('click', closeEditModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeEditModal(); });
+
+  document.getElementById('edit-save').addEventListener('click', async () => {
+    const text = editText.value.trim();
+    const type = editType.value;
+    if (!text || !activeEditId) return;
+    const body = new URLSearchParams({ text, type, subtype: editSubtype.value });
+    await fetch(`/edit/${activeEditId}`, { method: 'POST', body });
+    location.reload();
+  });
+
+  // ── Desktop action dispatch ───────────────────────────────────────────
+  document.querySelectorAll('.menu-item').forEach(item => {
+    item.addEventListener('click', async e => {
+      e.stopPropagation();
+      closeAllMenus();
+      const { action, id } = item.dataset;
+      const row = document.querySelector(`tr[data-type][data-done][data-date] td .actions-btn[data-id="${id}"]`)?.closest('tr');
+
+      if (action === 'edit') {
+        openEditModal(id, row?.dataset.text ?? '', row?.dataset.type ?? 'Other', row?.dataset.subtype ?? '');
+      } else if (action === 'duplicate') {
+        await fetch(`/duplicate/${id}`, { method: 'POST' });
+        location.reload();
+      } else if (action === 'delete') {
+        await fetch(`/delete/${id}`, { method: 'POST' });
+        if (row) { allRows.splice(allRows.indexOf(row), 1); row.remove(); }
+        const mItem = document.querySelector(`.mobile-item[data-id="${id}"]`);
+        if (mItem) { allMobileItems.splice(allMobileItems.indexOf(mItem), 1); mItem.remove(); }
+        applyFilters();
+      }
+    });
+  });
+
+  // ── Mobile detail sheet ───────────────────────────────────────────────
+  const mobileModal = document.getElementById('mobile-detail-modal');
+  const sheetEl     = mobileModal.querySelector('.sheet-modal');
+  let mmdCurrentId  = null;
+
+  function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function populateMobileDetail(id) {
+    const d = TASK_DATA[id];
+    if (!d) return;
+    mmdCurrentId = id;
+    let b = `<span class="badge type-${escH(d.typeCls)}">${escH(d.type)}</span>`;
+    if (d.subtype) b += ` <span class="badge subtype-badge">${escH(d.subtype)}</span>`;
+    document.getElementById('mmd-badges').innerHTML = b;
+    document.getElementById('mmd-content').innerHTML = d.textHtml || `<p>${escH(d.textPreview)}</p>`;
+    let meta = '';
+    if (d.source) meta += `<a href="${escH(d.source)}" target="_blank" rel="noopener noreferrer" class="source-link">${escH(d.displaySource)}</a>`;
+    meta += `<span>${escH(d.date)}</span>`;
+    document.getElementById('mmd-meta').innerHTML = meta;
+    document.getElementById('mmd-done-cb').checked = d.done === 'yes';
+  }
+
+  function openMobileDetail(id) {
+    if (!TASK_DATA[id]) return;
+    populateMobileDetail(id);
+    sheetEl.style.transform = '';
+    sheetEl.style.transition = '';
+    sheetEl.scrollTop = 0;
+    mobileModal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMobileDetail() {
+    mobileModal.hidden = true;
+    mmdCurrentId = null;
+    document.body.style.overflow = '';
+  }
+
+  document.getElementById('mmd-close').addEventListener('click', closeMobileDetail);
+  document.getElementById('mmd-close2').addEventListener('click', closeMobileDetail);
+  mobileModal.addEventListener('click', e => { if (e.target === mobileModal) closeMobileDetail(); });
+
+  // Done toggle inside sheet
+  document.getElementById('mmd-done-cb').addEventListener('change', async function() {
+    const id = mmdCurrentId;
+    if (!id) return;
+    const isDone = this.checked;
+    try {
+      await fetch(`/done/${id}`, { method: 'POST' });
+      syncTableRowDone(id, isDone);
+      syncMobileItemDone(id, isDone);
+      applyFilters();
+    } catch { this.checked = !this.checked; }
+  });
+
+  // Edit from sheet
+  document.getElementById('mmd-edit').addEventListener('click', () => {
+    const id = mmdCurrentId;
+    if (!id) return;
+    const d = TASK_DATA[id];
+    closeMobileDetail();
+    openEditModal(id, d.text, d.type, d.subtype);
+  });
+
+  // Delete from sheet
+  document.getElementById('mmd-delete').addEventListener('click', async () => {
+    const id = mmdCurrentId;
+    if (!id) return;
+    await fetch(`/delete/${id}`, { method: 'POST' });
+    closeMobileDetail();
+    const row = allRows.find(r => r.querySelector(`.done-toggle[data-id="${id}"]`));
+    if (row) { allRows.splice(allRows.indexOf(row), 1); row.remove(); }
+    const mItem = document.querySelector(`.mobile-item[data-id="${id}"]`);
+    if (mItem) { allMobileItems.splice(allMobileItems.indexOf(mItem), 1); mItem.remove(); }
+    applyFilters();
+  });
+
+  // ── Sheet swipe gestures ──────────────────────────────────────────────
+  let gStartX = 0, gStartY = 0, gType = null, gFromHandle = false;
+
+  sheetEl.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    gStartX = t.clientX;
+    gStartY = t.clientY;
+    gType = null;
+    gFromHandle = (t.clientY - sheetEl.getBoundingClientRect().top) < 52;
+    sheetEl.style.transition = 'none';
+  }, { passive: true });
+
+  sheetEl.addEventListener('touchmove', e => {
+    const dx = e.touches[0].clientX - gStartX;
+    const dy = e.touches[0].clientY - gStartY;
+    if (!gType) {
+      if (Math.abs(dx) > 7 || Math.abs(dy) > 7) {
+        gType = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      }
+      return;
+    }
+    if (gType === 'v') {
+      if (dy > 0 && (gFromHandle || sheetEl.scrollTop <= 2)) {
+        e.preventDefault();
+        sheetEl.style.transform = `translateY(${dy}px)`;
+      }
+    } else {
+      e.preventDefault();
+      sheetEl.style.transform = `translateX(${dx}px)`;
+    }
+  }, { passive: false });
+
+  sheetEl.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - gStartX;
+    const dy = e.changedTouches[0].clientY - gStartY;
+    if (gType === 'v' && dy > 88 && (gFromHandle || sheetEl.scrollTop <= 2)) {
+      sheetEl.style.transition = 'transform 0.22s ease-in';
+      sheetEl.style.transform = 'translateY(110%)';
+      setTimeout(() => { closeMobileDetail(); sheetEl.style.transform = ''; sheetEl.style.transition = ''; }, 225);
+    } else if (gType === 'h' && Math.abs(dx) > 75) {
+      navigateMobile(dx < 0 ? 1 : -1);
+    } else {
+      sheetEl.style.transition = 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      sheetEl.style.transform = '';
+      setTimeout(() => { sheetEl.style.transition = ''; }, 350);
+    }
+  }, { passive: true });
+
+  function navigateMobile(dir) {
+    const visible = allMobileItems.filter(i => i.style.display !== 'none');
+    const idx = visible.findIndex(i => i.dataset.id === mmdCurrentId);
+    const next = visible[idx + dir];
+    if (!next) {
+      const bump = dir > 0 ? '-18px' : '18px';
+      sheetEl.style.transition = 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      sheetEl.style.transform = bump;
+      setTimeout(() => { sheetEl.style.transform = ''; setTimeout(() => { sheetEl.style.transition = ''; }, 350); }, 350);
+      return;
+    }
+    const exitX = dir > 0 ? '-110%' : '110%';
+    sheetEl.style.transition = 'transform 0.18s ease-in';
+    sheetEl.style.transform = `translateX(${exitX})`;
+    setTimeout(() => {
+      populateMobileDetail(next.dataset.id);
+      sheetEl.scrollTop = 0;
+      sheetEl.style.transition = 'none';
+      sheetEl.style.transform = `translateX(${dir > 0 ? '110%' : '-110%'})`;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        sheetEl.style.transition = 'transform 0.22s ease-out';
+        sheetEl.style.transform = '';
+        setTimeout(() => { sheetEl.style.transition = ''; }, 225);
+      }));
+    }, 190);
+  }
+</script>
+</body>
+</html>
