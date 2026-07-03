@@ -59,7 +59,11 @@
     }
     .nav-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-light); border-color: rgba(224,234,248,0.35); }
     .nav-btn.active { background: rgba(255,255,255,0.15); border-color: rgba(224,234,248,0.55); color: var(--text-light); font-weight: 600; }
-    .scan-btn { cursor: pointer; font-family: inherit; margin-left: auto; }
+    .scan-btn {
+      cursor: pointer; font-family: inherit; margin-left: auto;
+      background: var(--btn); color: #fff; border-color: var(--btn); font-weight: 600;
+    }
+    .scan-btn:hover { background: var(--btn-h); color: #fff; border-color: var(--btn-h); }
     .scan-btn:disabled { opacity: 0.55; cursor: default; }
     .scan-btn.spinning { animation: scan-spin 1s linear infinite; }
     @keyframes scan-spin { to { transform: rotate(360deg); } }
@@ -103,7 +107,12 @@
 
     /* ── Table (desktop) ─────────────────────────────────────────────── */
     .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.845rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.845rem; table-layout: fixed; }
+    /* Fixed column widths so the Task column absorbs the remainder and wraps
+       instead of pushing Type/Source/Date off the right edge. */
+    .col-type   { width: 9.5rem; }
+    .col-source { width: 8rem; }
+    .col-date   { width: 6.5rem; }
     thead { background: #f0f4fc; }
     th {
       text-align: left; padding: 0.7rem 0.9rem;
@@ -127,9 +136,10 @@
     tr.is-done .task-preview { text-decoration: line-through; }
 
     /* Task expand/collapse (desktop) */
-    .task-preview  { display: block; cursor: pointer; line-height: 1.55; }
+    .col-task { overflow-wrap: anywhere; word-break: break-word; }
+    .task-preview  { display: block; cursor: pointer; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; }
     .expand-hint   { color: var(--muted-dark); font-size: 0.73rem; margin-left: 0.3em; user-select: none; opacity: 0.7; }
-    .task-expanded { display: none; cursor: pointer; line-height: 1.65; padding-top: 0.3rem; }
+    .task-expanded { display: none; cursor: pointer; line-height: 1.65; padding-top: 0.3rem; overflow-wrap: anywhere; word-break: break-word; }
     td.col-task.is-expanded .task-preview  { display: none; }
     td.col-task.is-expanded .task-expanded { display: block; animation: expand-in 0.18s ease; }
     @keyframes expand-in {
@@ -144,7 +154,7 @@
     .collapse-hint { display: block; color: var(--muted-dark); font-size: 0.7rem; margin-top: 0.55rem; user-select: none; opacity: 0.65; }
 
     /* ── Custom checkbox ─────────────────────────────────────────────── */
-    .col-done-cell { width: 2.5rem; text-align: center; }
+    .col-done-cell { width: 2.75rem; text-align: center; }
     .done-toggle {
       appearance: none; -webkit-appearance: none;
       width: 17px; height: 17px; border: 1.5px solid #b8c8e0; border-radius: 5px;
@@ -189,7 +199,7 @@
     .empty-icon { font-size: 2rem; opacity: 0.4; }
 
     /* ── Actions column ─────────────────────────────────────────────── */
-    .col-actions { width: 2.5rem; text-align: center; }
+    .col-actions { width: 2.75rem; text-align: center; }
     .actions-wrap { position: relative; display: inline-block; }
     .actions-btn { background: none; border: none; color: var(--muted-dark); font-size: 1.1rem; cursor: pointer; padding: 0.15rem 0.5rem; border-radius: 6px; line-height: 1; transition: background 0.12s, color 0.12s; }
     .actions-btn:hover { background: var(--divider); color: var(--text-dark); }
@@ -337,7 +347,7 @@
   <nav>
     <a href="/" class="nav-btn">Add Task</a>
     <a href="/tasks" class="nav-btn active">View Tasks</a>
-    <button id="scan-btn" class="nav-btn scan-btn" type="button" title="Fetch &amp; OCR Instagram posts">⟳ Scan Instagram</button>
+    <button id="scan-btn" class="nav-btn scan-btn" type="button" title="Fetch &amp; OCR Instagram posts, then fold the text into each task">⟳ Enrich Tasks</button>
     <span id="scan-status" class="scan-status"></span>
   </nav>
 
@@ -383,9 +393,9 @@
           <tr>
             <th class="col-done-cell" title="Mark complete">Done</th>
             <th>Task</th>
-            <th>Type</th>
+            <th class="col-type">Type</th>
             <th class="col-source">Source</th>
-            <th>Date</th>
+            <th class="col-date">Date</th>
             <th class="col-actions" aria-label="Actions"></th>
           </tr>
         </thead>
@@ -881,7 +891,7 @@
     scanBtn.addEventListener('click', async () => {
       scanBtn.disabled = true;
       const original = scanBtn.textContent;
-      scanBtn.textContent = '⟳ Scanning…';
+      scanBtn.textContent = '⟳ Enriching…';
       scanStatus.textContent = '';
       try {
         const res  = await fetch('/scan', { method: 'POST' });
