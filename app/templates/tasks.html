@@ -59,6 +59,15 @@
     }
     .nav-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-light); border-color: rgba(224,234,248,0.35); }
     .nav-btn.active { background: rgba(255,255,255,0.15); border-color: rgba(224,234,248,0.55); color: var(--text-light); font-weight: 600; }
+    .scan-btn {
+      cursor: pointer; font-family: inherit; margin-left: auto;
+      background: var(--btn); color: #fff; border-color: var(--btn); font-weight: 600;
+    }
+    .scan-btn:hover { background: var(--btn-h); color: #fff; border-color: var(--btn-h); }
+    .scan-btn:disabled { opacity: 0.55; cursor: default; }
+    .scan-btn.spinning { animation: scan-spin 1s linear infinite; }
+    @keyframes scan-spin { to { transform: rotate(360deg); } }
+    .scan-status { align-self: center; font-size: 0.72rem; color: var(--muted-light); letter-spacing: 0.02em; }
 
     /* ── Header ──────────────────────────────────────────────────────── */
     header { margin-bottom: 1.75rem; }
@@ -98,7 +107,12 @@
 
     /* ── Table (desktop) ─────────────────────────────────────────────── */
     .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.845rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.845rem; table-layout: fixed; }
+    /* Fixed column widths so the Task column absorbs the remainder and wraps
+       instead of pushing Type/Source/Date off the right edge. */
+    .col-type   { width: 9.5rem; }
+    .col-source { width: 8rem; }
+    .col-date   { width: 6.5rem; }
     thead { background: #f0f4fc; }
     th {
       text-align: left; padding: 0.7rem 0.9rem;
@@ -122,9 +136,10 @@
     tr.is-done .task-preview { text-decoration: line-through; }
 
     /* Task expand/collapse (desktop) */
-    .task-preview  { display: block; cursor: pointer; line-height: 1.55; }
+    .col-task { overflow-wrap: anywhere; word-break: break-word; }
+    .task-preview  { display: block; cursor: pointer; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; }
     .expand-hint   { color: var(--muted-dark); font-size: 0.73rem; margin-left: 0.3em; user-select: none; opacity: 0.7; }
-    .task-expanded { display: none; cursor: pointer; line-height: 1.65; padding-top: 0.3rem; }
+    .task-expanded { display: none; cursor: pointer; line-height: 1.65; padding-top: 0.3rem; overflow-wrap: anywhere; word-break: break-word; }
     td.col-task.is-expanded .task-preview  { display: none; }
     td.col-task.is-expanded .task-expanded { display: block; animation: expand-in 0.18s ease; }
     @keyframes expand-in {
@@ -139,7 +154,7 @@
     .collapse-hint { display: block; color: var(--muted-dark); font-size: 0.7rem; margin-top: 0.55rem; user-select: none; opacity: 0.65; }
 
     /* ── Custom checkbox ─────────────────────────────────────────────── */
-    .col-done-cell { width: 2.5rem; text-align: center; }
+    .col-done-cell { width: 2.75rem; text-align: center; }
     .done-toggle {
       appearance: none; -webkit-appearance: none;
       width: 17px; height: 17px; border: 1.5px solid #b8c8e0; border-radius: 5px;
@@ -167,6 +182,12 @@
     .type-art       { background: #fde8d0; color: #8a4a1a; border: 1px solid #f0c89a; }
     .type-events    { background: #d0eeec; color: #1a6b68; border: 1px solid #a0d8d4; }
     .subtype-badge  { background: #eef2fb; color: #4a6090; border: 1px solid #c8d4e8; font-size: 0.62rem; padding: 0.14rem 0.48rem; margin-left: 0.28rem; }
+    /* Instagram-enrichment status badge */
+    .ig-badge       { background: #fdeef5; color: #9c3a72; border: 1px solid #f0c8dc; font-size: 0.62rem; padding: 0.14rem 0.48rem; margin-left: 0.28rem; }
+    .ig-badge.ig-yes   { background: #d4edda; color: #1e5c30; border-color: #a8d4b4; }
+    .ig-badge.ig-error { background: #fdecea; color: #b03024; border-color: #f0b4ae; }
+    /* Enrichment-appended images inside expanded / detail views */
+    .task-expanded img, .sheet-content img { max-width: 100%; height: auto; border-radius: 10px; margin: 0.35rem 0; display: block; }
 
     /* ── Links ───────────────────────────────────────────────────────── */
     .task-link  { color: var(--btn); text-decoration: underline; word-break: break-all; }
@@ -178,9 +199,9 @@
     .empty-icon { font-size: 2rem; opacity: 0.4; }
 
     /* ── Actions column ─────────────────────────────────────────────── */
-    .col-actions { width: 2.5rem; text-align: center; }
+    .col-actions { width: 3.25rem; text-align: center; }
     .actions-wrap { position: relative; display: inline-block; }
-    .actions-btn { background: none; border: none; color: var(--muted-dark); font-size: 1.1rem; cursor: pointer; padding: 0.15rem 0.5rem; border-radius: 6px; line-height: 1; transition: background 0.12s, color 0.12s; }
+    .actions-btn { background: none; border: none; color: var(--muted-dark); font-size: 1.1rem; cursor: pointer; padding: 0.15rem 0.5rem; margin-right: 0.4rem; border-radius: 6px; line-height: 1; transition: background 0.12s, color 0.12s; }
     .actions-btn:hover { background: var(--divider); color: var(--text-dark); }
 
     /* ── Dropdown menu ───────────────────────────────────────────────── */
@@ -326,6 +347,8 @@
   <nav>
     <a href="/" class="nav-btn">Add Task</a>
     <a href="/tasks" class="nav-btn active">View Tasks</a>
+    <button id="scan-btn" class="nav-btn scan-btn" type="button" title="Fetch &amp; OCR Instagram posts, then fold the text into each task">⟳ Enrich Tasks</button>
+    <span id="scan-status" class="scan-status"></span>
   </nav>
 
   <header>
@@ -345,6 +368,11 @@
       <button class="pill" data-type-filter="Art">Art</button>
       <button class="pill" data-type-filter="Events">Events</button>
       <button class="pill" data-type-filter="Other">Other</button>
+    </div>
+    <div class="filter-group" id="subtype-filter-group">
+      <span class="filter-label">Subtype</span>
+      <button class="pill active" data-subtype-filter="all">All</button>
+      <!-- subtype pills injected by JS from the tasks' actual subtypes -->
     </div>
     <div class="filter-group">
       <span class="filter-label">Status</span>
@@ -370,9 +398,9 @@
           <tr>
             <th class="col-done-cell" title="Mark complete">Done</th>
             <th>Task</th>
-            <th>Type</th>
+            <th class="col-type">Type</th>
             <th class="col-source">Source</th>
-            <th>Date</th>
+            <th class="col-date">Date</th>
             <th class="col-actions" aria-label="Actions"></th>
           </tr>
         </thead>
@@ -401,6 +429,7 @@
             <td>
               <span class="badge type-{{ type_cls.get(todo.type, 'other') }}">{{ todo.type }}</span>
               {% if todo.subtype %}<span class="badge subtype-badge">{{ todo.subtype }}</span>{% endif %}
+              {% if todo.is_instagram %}<span class="badge ig-badge ig-{{ todo.enriched or 'pending' }}" title="Instagram — {{ 'enriched' if todo.enriched == 'yes' else ('enrichment error' if todo.enriched == 'error' else 'not yet enriched') }}">📷 {{ '✓' if todo.enriched == 'yes' else ('!' if todo.enriched == 'error' else '…') }}</span>{% endif %}
             </td>
             <td class="col-source">
               {% if todo.source %}
@@ -429,6 +458,7 @@
       {% for todo in todos %}
       <div class="mobile-item {{ 'is-done' if todo.done == 'yes' else '' }}"
            data-type="{{ todo.type }}"
+           data-subtype="{{ todo.subtype }}"
            data-done="{{ todo.done }}"
            data-date="{{ todo.date_added }}"
            data-id="{{ todo.id }}"
@@ -438,6 +468,7 @@
           <div class="mobile-item-meta">
             <span class="badge type-{{ type_cls.get(todo.type, 'other') }}">{{ todo.type }}</span>
             {% if todo.subtype %}<span class="badge subtype-badge">{{ todo.subtype }}</span>{% endif %}
+            {% if todo.is_instagram %}<span class="badge ig-badge ig-{{ todo.enriched or 'pending' }}">📷 {{ '✓' if todo.enriched == 'yes' else ('!' if todo.enriched == 'error' else '…') }}</span>{% endif %}
             <span class="mobile-date">{{ todo.date_added }}</span>
           </div>
         </div>
@@ -545,9 +576,10 @@
   // ── Filter / sort state ───────────────────────────────────────────────
   const allRows        = Array.from(document.querySelectorAll('tbody tr'));
   const allMobileItems = Array.from(document.querySelectorAll('.mobile-item'));
-  let activeType   = 'all';
-  let activeStatus = 'active';
-  let sortOrder    = 'newest';
+  let activeType    = 'all';
+  let activeSubtype = 'all';
+  let activeStatus  = 'active';
+  let sortOrder     = 'newest';
 
   function updateCount() {
     const visible = allRows.filter(r => r.style.display !== 'none');
@@ -559,11 +591,13 @@
   function applyFilters() {
     [allRows, allMobileItems].forEach(list => {
       list.forEach(el => {
-        const typeMatch   = activeType === 'all' || el.dataset.type === activeType;
-        const statusMatch = activeStatus === 'all'
+        const typeMatch    = activeType === 'all' || el.dataset.type === activeType;
+        const subtypeMatch = activeSubtype === 'all'
+          || (el.dataset.subtype || '').toLowerCase() === activeSubtype.toLowerCase();
+        const statusMatch  = activeStatus === 'all'
           || (activeStatus === 'active' && el.dataset.done !== 'yes')
           || (activeStatus === 'done'   && el.dataset.done === 'yes');
-        el.style.display = (typeMatch && statusMatch) ? '' : 'none';
+        el.style.display = (typeMatch && subtypeMatch && statusMatch) ? '' : 'none';
       });
     });
     updateCount();
@@ -595,6 +629,42 @@
       applyFilters();
     });
   });
+
+  // Subtype filter — pills are built from the subtypes actually present in the
+  // tasks, deduped case-insensitively (so Tech "Other" and Art "other" collapse
+  // into one pill). Preserve the cased variant for display (e.g. "AI", "Other").
+  (function buildSubtypeFilter() {
+    const group = document.getElementById('subtype-filter-group');
+    if (!group) return;
+    const seen = new Map();                       // lower-cased key -> display value
+    allRows.forEach(r => {
+      const s = (r.dataset.subtype || '').trim();
+      if (!s) return;
+      const key = s.toLowerCase();
+      const existing = seen.get(key);
+      // Prefer a variant containing an uppercase letter for display.
+      if (!existing || (existing === existing.toLowerCase() && s !== s.toLowerCase())) {
+        seen.set(key, s);
+      }
+    });
+    const values = [...seen.values()].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    if (!values.length) { group.style.display = 'none'; return; }
+    for (const val of values) {
+      const btn = document.createElement('button');
+      btn.className = 'pill';
+      btn.dataset.subtypeFilter = val;
+      btn.textContent = val;
+      group.appendChild(btn);
+    }
+    group.querySelectorAll('[data-subtype-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeSubtype = btn.dataset.subtypeFilter;
+        group.querySelectorAll('[data-subtype-filter]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyFilters();
+      });
+    });
+  })();
 
   // Status filter
   document.querySelectorAll('[data-status-filter]').forEach(btn => {
@@ -681,19 +751,31 @@
   const editSubtypeField = document.getElementById('edit-subtype-field');
   let   activeEditId     = null;
 
-  function updateEditSubtype() {
-    const isTech = editType.value === 'Tech';
-    editSubtypeField.style.display = isTech ? '' : 'none';
-    if (!isTech) editSubtype.value = 'Other';
+  // Types that carry a subtype dropdown, with their option lists (mirrors input.html).
+  const EDIT_SUBTYPES = {
+    Tech: ['Other', 'AI', 'Hardware', 'Creative'],
+    Art:  ['movie/tv', 'music', 'digital', 'craft', 'other'],
+  };
+
+  function updateEditSubtype(desired) {
+    const opts = EDIT_SUBTYPES[editType.value];
+    if (opts) {
+      editSubtype.innerHTML = opts
+        .map(o => `<option value="${o}">${o}</option>`).join('');
+      if (desired && opts.includes(desired)) editSubtype.value = desired;
+      editSubtypeField.style.display = '';
+    } else {
+      editSubtypeField.style.display = 'none';
+      editSubtype.innerHTML = '';
+    }
   }
-  editType.addEventListener('change', updateEditSubtype);
+  editType.addEventListener('change', () => updateEditSubtype());
 
   function openEditModal(id, text, type, subtype) {
     activeEditId      = id;
     editText.value    = text;
     editType.value    = type;
-    editSubtype.value = subtype || 'Other';
-    updateEditSubtype();
+    updateEditSubtype(subtype);
     modal.hidden      = false;
     editText.focus();
   }
@@ -858,6 +940,39 @@
       setTimeout(() => { sheetEl.style.transition = ''; }, 350);
     }
   }, { passive: true });
+
+  // ── Instagram scan ────────────────────────────────────────────────────
+  const scanBtn    = document.getElementById('scan-btn');
+  const scanStatus = document.getElementById('scan-status');
+  if (scanBtn) {
+    scanBtn.addEventListener('click', async () => {
+      scanBtn.disabled = true;
+      const original = scanBtn.textContent;
+      scanBtn.textContent = '⟳ Enriching…';
+      scanStatus.textContent = '';
+      try {
+        const res  = await fetch('/scan', { method: 'POST' });
+        const data = await res.json();
+        const n = data.queued || 0;
+        if (n > 0) {
+          // Enrichment runs on a background worker (network + OCR, a few
+          // seconds per post). Reload once it's had time to make progress;
+          // the 📷 badges flip to ✓ as rows finish.
+          scanStatus.textContent = `Enriching ${n} post${n === 1 ? '' : 's'} in the background…`;
+          setTimeout(() => location.reload(), Math.min(6000 + n * 1500, 30000));
+        } else {
+          scanStatus.textContent = 'Nothing new to enrich';
+          scanBtn.disabled = false;
+          scanBtn.textContent = original;
+          setTimeout(() => { scanStatus.textContent = ''; }, 4000);
+        }
+      } catch {
+        scanStatus.textContent = 'Scan failed';
+        scanBtn.disabled = false;
+        scanBtn.textContent = original;
+      }
+    });
+  }
 
   function navigateMobile(dir) {
     const visible = allMobileItems.filter(i => i.style.display !== 'none');

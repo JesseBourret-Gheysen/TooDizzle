@@ -6,6 +6,8 @@ services:
       - "80"
     volumes:
       - /home/jesse/docker/toodizzle/data:/data
+    environment:
+      - N8N_WEBHOOK_BASE=http://n8n:5678
     networks:
       - localweb
     restart: unless-stopped
