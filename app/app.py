@@ -24,6 +24,8 @@ LOCK_PATH = '/data/.todos.lock'
 BACKUP_DIR = '/data/backups'
 IMAGE_DIR = '/data/instagram'   # downloaded Instagram cover images live here
 FIELDNAMES = ['id', 'text', 'type', 'subtype', 'date_added', 'done', 'enriched']
+# Types that carry a subtype dropdown (see the templates for the option lists).
+SUBTYPE_TYPES = {'Tech', 'Art'}
 URL_RE = re.compile(r'https?://[^\s<>"]+')
 
 N8N_WEBHOOK_BASE = os.environ.get('N8N_WEBHOOK_BASE', '').rstrip('/')
@@ -223,7 +225,7 @@ def submit():
         'id': task_id,
         'text': text,
         'type': todo_type,
-        'subtype': request.form.get('subtype', '').strip() if request.form.get('type') == 'Tech' else '',
+        'subtype': request.form.get('subtype', '').strip() if todo_type in SUBTYPE_TYPES else '',
         'date_added': date_added,
         'done': '',
         'enriched': '',
@@ -280,7 +282,7 @@ def edit_todo(item_id):
     ensure_csv()
     with _csv_lock():
         rows = _read_rows_raw()
-        new_subtype = request.form.get('subtype', '').strip() if todo_type == 'Tech' else ''
+        new_subtype = request.form.get('subtype', '').strip() if todo_type in SUBTYPE_TYPES else ''
         for row in rows:
             if row['id'] == item_id:
                 row['text'] = text
@@ -347,7 +349,7 @@ def api_create_task():
         'id': str(uuid.uuid4())[:8],
         'text': text,
         'type': todo_type,
-        'subtype': (data.get('subtype') or '').strip() if todo_type == 'Tech' else '',
+        'subtype': (data.get('subtype') or '').strip() if todo_type in SUBTYPE_TYPES else '',
         'date_added': datetime.now().strftime('%Y-%m-%d'),
         'done': '',
         'enriched': '',
@@ -380,7 +382,7 @@ def api_update_task(item_id):
         if 'type' in data:
             target['type'] = str(data['type']).strip()
         if 'subtype' in data:
-            target['subtype'] = str(data['subtype']).strip() if target['type'] == 'Tech' else ''
+            target['subtype'] = str(data['subtype']).strip() if target['type'] in SUBTYPE_TYPES else ''
         if 'done' in data:
             was_done = target['done']
             target['done'] = 'yes' if data['done'] else ''

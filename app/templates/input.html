@@ -230,10 +230,22 @@
   const subtypeField  = document.getElementById('subtype-field');
   const subtypeSelect = document.getElementById('subtype');
 
+  // Types that carry a subtype dropdown, with their option lists.
+  const SUBTYPES = {
+    Tech: ['Other', 'AI', 'Hardware', 'Creative'],
+    Art:  ['movie/tv', 'music', 'digital', 'craft', 'other'],
+  };
+
   function updateSubtype() {
-    const isTech = typeSelect.value === 'Tech';
-    subtypeField.style.display = isTech ? '' : 'none';
-    if (!isTech) subtypeSelect.value = 'Other';
+    const opts = SUBTYPES[typeSelect.value];
+    if (opts) {
+      subtypeSelect.innerHTML = opts
+        .map(o => `<option value="${o}">${o}</option>`).join('');
+      subtypeField.style.display = '';
+    } else {
+      subtypeField.style.display = 'none';
+      subtypeSelect.innerHTML = '';
+    }
   }
 
   typeSelect.addEventListener('change', updateSubtype);

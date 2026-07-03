@@ -706,19 +706,31 @@
   const editSubtypeField = document.getElementById('edit-subtype-field');
   let   activeEditId     = null;
 
-  function updateEditSubtype() {
-    const isTech = editType.value === 'Tech';
-    editSubtypeField.style.display = isTech ? '' : 'none';
-    if (!isTech) editSubtype.value = 'Other';
+  // Types that carry a subtype dropdown, with their option lists (mirrors input.html).
+  const EDIT_SUBTYPES = {
+    Tech: ['Other', 'AI', 'Hardware', 'Creative'],
+    Art:  ['movie/tv', 'music', 'digital', 'craft', 'other'],
+  };
+
+  function updateEditSubtype(desired) {
+    const opts = EDIT_SUBTYPES[editType.value];
+    if (opts) {
+      editSubtype.innerHTML = opts
+        .map(o => `<option value="${o}">${o}</option>`).join('');
+      if (desired && opts.includes(desired)) editSubtype.value = desired;
+      editSubtypeField.style.display = '';
+    } else {
+      editSubtypeField.style.display = 'none';
+      editSubtype.innerHTML = '';
+    }
   }
-  editType.addEventListener('change', updateEditSubtype);
+  editType.addEventListener('change', () => updateEditSubtype());
 
   function openEditModal(id, text, type, subtype) {
     activeEditId      = id;
     editText.value    = text;
     editType.value    = type;
-    editSubtype.value = subtype || 'Other';
-    updateEditSubtype();
+    updateEditSubtype(subtype);
     modal.hidden      = false;
     editText.focus();
   }
