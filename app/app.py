@@ -1,8 +1,10 @@
 import csv
+import json
 import os
 import re
 import uuid
 import threading
+import urllib.request
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -10,12 +12,64 @@ import markupsafe
 import markdown as _md
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 
+import store
+from store import InsufficientSpaceError
+
 app = Flask(__name__)
 
 CSV_PATH = '/data/todos.csv'
+LOCK_PATH = '/data/.todos.lock'
+BACKUP_DIR = '/data/backups'
 FIELDNAMES = ['id', 'text', 'type', 'subtype', 'date_added', 'done']
-_lock = threading.Lock()
 URL_RE = re.compile(r'https?://[^\s<>"]+')
+
+N8N_WEBHOOK_BASE = os.environ.get('N8N_WEBHOOK_BASE', '').rstrip('/')
+
+
+def _csv_lock():
+    """Exclusive lock around every CSV mutation (threading.Lock + fcntl.flock).
+    Backup/atomic/prune logic lives in store.py. Not reentrant — never nest it."""
+    return store.CsvLock(LOCK_PATH)
+
+
+def _read_rows_raw():
+    """Read all rows, normalized to FIELDNAMES. Caller must hold _csv_lock()."""
+    return store.read_rows(CSV_PATH, FIELDNAMES)
+
+
+def _atomic_write(rows):
+    """Atomically replace CSV_PATH with `rows`. Caller must hold _csv_lock().
+    Space-checks (raises InsufficientSpaceError → HTTP 507), wipe-guards, takes a
+    deduped backup, and prunes to record_count*2. See store.atomic_write."""
+    store.atomic_write(CSV_PATH, FIELDNAMES, BACKUP_DIR, rows)
+
+
+@app.errorhandler(InsufficientSpaceError)
+def _handle_insufficient_space(exc):
+    return jsonify({'error': 'insufficient storage: mutation refused'}), 507
+
+
+def _fire_webhook(url, payload):
+    try:
+        body = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            url, data=body,
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass  # never block the app if n8n is down
+
+
+def send_webhook(path, payload):
+    if not N8N_WEBHOOK_BASE:
+        return
+    threading.Thread(
+        target=_fire_webhook,
+        args=(f"{N8N_WEBHOOK_BASE}{path}", payload),
+        daemon=True
+    ).start()
 
 
 @app.template_filter('linkify')
@@ -36,30 +90,21 @@ def linkify_filter(text):
 
 
 def ensure_csv():
-    os.makedirs('/data', exist_ok=True)
-    if not os.path.exists(CSV_PATH):
-        with open(CSV_PATH, 'w', newline='') as f:
-            csv.DictWriter(f, fieldnames=FIELDNAMES).writeheader()
-        return
-    with open(CSV_PATH, 'r', newline='') as f:
-        existing = csv.DictReader(f).fieldnames or []
-    if any(col not in existing for col in FIELDNAMES):
+    with _csv_lock():
+        if not os.path.exists(CSV_PATH):
+            _atomic_write([])
+            return
+        # Migrate existing CSV if new columns are missing
         with open(CSV_PATH, 'r', newline='') as f:
-            rows = list(csv.DictReader(f))
-        with open(CSV_PATH, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            for row in rows:
-                for col in FIELDNAMES:
-                    row.setdefault(col, '')
-                writer.writerow({col: row[col] for col in FIELDNAMES})
+            existing = csv.DictReader(f).fieldnames or []
+        if any(col not in existing for col in FIELDNAMES):
+            _atomic_write(_read_rows_raw())
 
 
 def read_todos():
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'r', newline='') as f:
-            rows = list(csv.DictReader(f))
+    with _csv_lock():
+        rows = _read_rows_raw()
     for row in rows:
         for col in FIELDNAMES:
             row.setdefault(col, '')
@@ -112,41 +157,44 @@ def submit():
     text = request.form.get('text', '').strip()
     if not text:
         return redirect(url_for('index'))
+    task_id = str(uuid.uuid4())[:8]
+    todo_type = request.form.get('type', 'Other').strip()
+    date_added = datetime.now().strftime('%Y-%m-%d')
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'a', newline='') as f:
-            csv.DictWriter(f, fieldnames=FIELDNAMES).writerow({
-                'id': str(uuid.uuid4())[:8],
-                'text': text,
-                'type': request.form.get('type', 'Other').strip(),
-                'subtype': request.form.get('subtype', '').strip() if request.form.get('type') == 'Tech' else '',
-                'date_added': datetime.now().strftime('%Y-%m-%d'),
-                'done': '',
-            })
+    with _csv_lock():
+        rows = _read_rows_raw()
+        rows.append({
+            'id': task_id,
+            'text': text,
+            'type': todo_type,
+            'subtype': request.form.get('subtype', '').strip() if request.form.get('type') == 'Tech' else '',
+            'date_added': date_added,
+            'done': '',
+        })
+        _atomic_write(rows)
+    send_webhook('/webhook/toodizzle-events', {
+        'event': 'task.created',
+        'task': {'id': task_id, 'title': text, 'type': todo_type, 'date_added': date_added},
+    })
     return redirect(url_for('index'))
 
 
 @app.route('/delete/<item_id>', methods=['POST'])
 def delete_todo(item_id):
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'r', newline='') as f:
-            rows = list(csv.DictReader(f))
-        rows = [r for r in rows if r['id'] != item_id]
-        with open(CSV_PATH, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            for row in rows:
-                writer.writerow({col: row.get(col, '') for col in FIELDNAMES})
+    with _csv_lock():
+        rows = _read_rows_raw()
+        new_rows = [r for r in rows if r['id'] != item_id]
+        if len(new_rows) != len(rows):
+            _atomic_write(new_rows)
     return ('', 204)
 
 
 @app.route('/duplicate/<item_id>', methods=['POST'])
 def duplicate_todo(item_id):
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'r', newline='') as f:
-            rows = list(csv.DictReader(f))
+    with _csv_lock():
+        rows = _read_rows_raw()
         original = next((r for r in rows if r['id'] == item_id), None)
         if original:
             rows.append({
@@ -157,11 +205,7 @@ def duplicate_todo(item_id):
                 'date_added': datetime.now().strftime('%Y-%m-%d'),
                 'done': '',
             })
-            with open(CSV_PATH, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-                writer.writeheader()
-                for row in rows:
-                    writer.writerow({col: row.get(col, '') for col in FIELDNAMES})
+            _atomic_write(rows)
     return ('', 204)
 
 
@@ -172,9 +216,8 @@ def edit_todo(item_id):
     if not text:
         return ('', 400)
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'r', newline='') as f:
-            rows = list(csv.DictReader(f))
+    with _csv_lock():
+        rows = _read_rows_raw()
         new_subtype = request.form.get('subtype', '').strip() if todo_type == 'Tech' else ''
         for row in rows:
             if row['id'] == item_id:
@@ -182,29 +225,30 @@ def edit_todo(item_id):
                 row['type'] = todo_type
                 row['subtype'] = new_subtype
                 break
-        with open(CSV_PATH, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            for row in rows:
-                writer.writerow({col: row.get(col, '') for col in FIELDNAMES})
+        _atomic_write(rows)
     return ('', 204)
 
 
 @app.route('/done/<item_id>', methods=['POST'])
 def toggle_done(item_id):
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'r', newline='') as f:
-            rows = list(csv.DictReader(f))
+    completed_task = None
+    with _csv_lock():
+        rows = _read_rows_raw()
         for row in rows:
             if row['id'] == item_id:
-                row['done'] = '' if row['done'] == 'yes' else 'yes'
+                if row['done'] == '':
+                    row['done'] = 'yes'
+                    completed_task = dict(row)
+                else:
+                    row['done'] = ''
                 break
-        with open(CSV_PATH, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            for row in rows:
-                writer.writerow({col: row.get(col, '') for col in FIELDNAMES})
+        _atomic_write(rows)
+    if completed_task:
+        send_webhook('/webhook/toodizzle-events', {
+            'event': 'task.completed',
+            'task': {'id': completed_task['id'], 'title': completed_task['text'], 'type': completed_task['type']},
+        })
     return ('', 204)
 
 
@@ -222,9 +266,8 @@ def api_list_tasks():
 @app.route('/api/tasks/<item_id>', methods=['GET'])
 def api_get_task(item_id):
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'r', newline='') as f:
-            rows = list(csv.DictReader(f))
+    with _csv_lock():
+        rows = _read_rows_raw()
     row = next((r for r in rows if r['id'] == item_id), None)
     if row is None:
         return jsonify({'error': 'not found'}), 404
@@ -247,9 +290,14 @@ def api_create_task():
         'done': '',
     }
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'a', newline='') as f:
-            csv.DictWriter(f, fieldnames=FIELDNAMES).writerow(new_row)
+    with _csv_lock():
+        rows = _read_rows_raw()
+        rows.append(new_row)
+        _atomic_write(rows)
+    send_webhook('/webhook/toodizzle-events', {
+        'event': 'task.created',
+        'task': {'id': new_row['id'], 'title': new_row['text'], 'type': new_row['type'], 'date_added': new_row['date_added']},
+    })
     return jsonify(new_row), 201
 
 
@@ -257,9 +305,9 @@ def api_create_task():
 def api_update_task(item_id):
     data = request.get_json(force=True, silent=True) or {}
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'r', newline='') as f:
-            rows = list(csv.DictReader(f))
+    completed = None
+    with _csv_lock():
+        rows = _read_rows_raw()
         target = next((r for r in rows if r['id'] == item_id), None)
         if target is None:
             return jsonify({'error': 'not found'}), 404
@@ -270,12 +318,16 @@ def api_update_task(item_id):
         if 'subtype' in data:
             target['subtype'] = str(data['subtype']).strip() if target['type'] == 'Tech' else ''
         if 'done' in data:
+            was_done = target['done']
             target['done'] = 'yes' if data['done'] else ''
-        with open(CSV_PATH, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            for row in rows:
-                writer.writerow({col: row.get(col, '') for col in FIELDNAMES})
+            if data['done'] and was_done != 'yes':
+                completed = dict(target)
+        _atomic_write(rows)
+    if completed:
+        send_webhook('/webhook/toodizzle-events', {
+            'event': 'task.completed',
+            'task': {'id': completed['id'], 'title': completed['text'], 'type': completed['type']},
+        })
     return jsonify(_task_dict(target))
 
 
@@ -297,16 +349,11 @@ def api_get_tasks_by_title(query):
 @app.route('/api/tasks/<item_id>', methods=['DELETE'])
 def api_delete_task(item_id):
     ensure_csv()
-    with _lock:
-        with open(CSV_PATH, 'r', newline='') as f:
-            rows = list(csv.DictReader(f))
+    with _csv_lock():
+        rows = _read_rows_raw()
         original_len = len(rows)
         rows = [r for r in rows if r['id'] != item_id]
         if len(rows) == original_len:
             return jsonify({'error': 'not found'}), 404
-        with open(CSV_PATH, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            for row in rows:
-                writer.writerow({col: row.get(col, '') for col in FIELDNAMES})
+        _atomic_write(rows)
     return ('', 204)
