@@ -65,6 +65,8 @@
       color: var(--text-light);
       font-weight: 600;
     }
+    .scan-btn { cursor: pointer; font-family: inherit; margin-left: auto; }
+    .scan-btn:disabled { opacity: 0.55; cursor: default; }
 
     /* ── Header ──────────────────────────────────────────────────────── */
     header { margin-bottom: 2rem; }
@@ -175,6 +177,7 @@
   <nav>
     <a href="/" class="nav-btn active">Add Task</a>
     <a href="/tasks" class="nav-btn">View Tasks</a>
+    <button id="scan-btn" class="nav-btn scan-btn" type="button" title="Fetch &amp; OCR Instagram posts">⟳ Scan Instagram</button>
   </nav>
 
   <header>
@@ -231,6 +234,17 @@
 
   typeSelect.addEventListener('change', updateSubtype);
   updateSubtype();
+
+  // Scan Instagram links, then jump to the task list to watch progress.
+  const scanBtn = document.getElementById('scan-btn');
+  if (scanBtn) {
+    scanBtn.addEventListener('click', async () => {
+      scanBtn.disabled = true;
+      scanBtn.textContent = '⟳ Scanning…';
+      try { await fetch('/scan', { method: 'POST' }); } catch {}
+      window.location.href = '/tasks';
+    });
+  }
 </script>
 </body>
 </html>

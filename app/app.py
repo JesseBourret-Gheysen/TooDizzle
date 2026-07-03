@@ -10,17 +10,20 @@ from urllib.parse import urlparse
 
 import markupsafe
 import markdown as _md
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import (Flask, render_template, request, redirect, url_for, jsonify,
+                   send_from_directory, abort)
 
 import store
 from store import InsufficientSpaceError
+import enrich
 
 app = Flask(__name__)
 
 CSV_PATH = '/data/todos.csv'
 LOCK_PATH = '/data/.todos.lock'
 BACKUP_DIR = '/data/backups'
-FIELDNAMES = ['id', 'text', 'type', 'subtype', 'date_added', 'done']
+IMAGE_DIR = '/data/instagram'   # downloaded Instagram cover images live here
+FIELDNAMES = ['id', 'text', 'type', 'subtype', 'date_added', 'done', 'enriched']
 URL_RE = re.compile(r'https?://[^\s<>"]+')
 
 N8N_WEBHOOK_BASE = os.environ.get('N8N_WEBHOOK_BASE', '').rstrip('/')
@@ -47,6 +50,37 @@ def _atomic_write(rows):
 @app.errorhandler(InsufficientSpaceError)
 def _handle_insufficient_space(exc):
     return jsonify({'error': 'insufficient storage: mutation refused'}), 507
+
+
+# --- Instagram enrichment wiring -------------------------------------------
+# The enrichment worker (enrich.py) runs off the request path. It reads/updates
+# single rows through these lock-holding helpers so it never races the app's own
+# CSV mutations.
+
+def _get_task(item_id):
+    """Return a copy of the row with `item_id`, or None. Takes the CSV lock."""
+    ensure_csv()
+    with _csv_lock():
+        rows = _read_rows_raw()
+    row = next((r for r in rows if r['id'] == item_id), None)
+    return dict(row) if row else None
+
+
+def _update_task(item_id, updates):
+    """Apply `updates` (field->value) to the row with `item_id`. Takes the lock."""
+    ensure_csv()
+    with _csv_lock():
+        rows = _read_rows_raw()
+        for row in rows:
+            if row['id'] == item_id:
+                row.update(updates)
+                break
+        else:
+            return
+        _atomic_write(rows)
+
+
+enrich.init(_get_task, _update_task, IMAGE_DIR)
 
 
 def _fire_webhook(url, payload):
@@ -108,6 +142,7 @@ def read_todos():
     for row in rows:
         for col in FIELDNAMES:
             row.setdefault(col, '')
+        row['is_instagram'] = bool(enrich.extract_shortcode(row['text']))
         m = URL_RE.search(row['text'])
         if m:
             row['link'] = m.group()
@@ -152,6 +187,30 @@ def tasks():
     return render_template('tasks.html', todos=todos)
 
 
+@app.route('/scan', methods=['POST'])
+def scan():
+    """Queue every un-enriched Instagram todo for enrichment. Returns the count
+    queued; the actual fetching/OCR happens on the background worker."""
+    ensure_csv()
+    with _csv_lock():
+        rows = _read_rows_raw()
+    queued = enrich.scan(rows)
+    return jsonify({'queued': queued})
+
+
+@app.route('/instagram-image/<shortcode>/<path:filename>')
+def instagram_image(shortcode, filename):
+    """Serve a downloaded Instagram cover image. Both path parts are validated
+    so a crafted request can't escape IMAGE_DIR."""
+    if not re.fullmatch(r'[A-Za-z0-9_-]+', shortcode) \
+            or not re.fullmatch(r'[A-Za-z0-9_.-]+', filename):
+        abort(404)
+    directory = os.path.join(IMAGE_DIR, shortcode)
+    if not os.path.isfile(os.path.join(directory, filename)):
+        abort(404)
+    return send_from_directory(directory, filename)
+
+
 @app.route('/submit', methods=['POST'])
 def submit():
     text = request.form.get('text', '').strip()
@@ -160,18 +219,21 @@ def submit():
     task_id = str(uuid.uuid4())[:8]
     todo_type = request.form.get('type', 'Other').strip()
     date_added = datetime.now().strftime('%Y-%m-%d')
+    new_row = {
+        'id': task_id,
+        'text': text,
+        'type': todo_type,
+        'subtype': request.form.get('subtype', '').strip() if request.form.get('type') == 'Tech' else '',
+        'date_added': date_added,
+        'done': '',
+        'enriched': '',
+    }
     ensure_csv()
     with _csv_lock():
         rows = _read_rows_raw()
-        rows.append({
-            'id': task_id,
-            'text': text,
-            'type': todo_type,
-            'subtype': request.form.get('subtype', '').strip() if request.form.get('type') == 'Tech' else '',
-            'date_added': date_added,
-            'done': '',
-        })
+        rows.append(new_row)
         _atomic_write(rows)
+    enrich.maybe_enqueue(new_row)
     send_webhook('/webhook/toodizzle-events', {
         'event': 'task.created',
         'task': {'id': task_id, 'title': text, 'type': todo_type, 'date_added': date_added},
@@ -288,12 +350,14 @@ def api_create_task():
         'subtype': (data.get('subtype') or '').strip() if todo_type == 'Tech' else '',
         'date_added': datetime.now().strftime('%Y-%m-%d'),
         'done': '',
+        'enriched': '',
     }
     ensure_csv()
     with _csv_lock():
         rows = _read_rows_raw()
         rows.append(new_row)
         _atomic_write(rows)
+    enrich.maybe_enqueue(new_row)
     send_webhook('/webhook/toodizzle-events', {
         'event': 'task.created',
         'task': {'id': new_row['id'], 'title': new_row['text'], 'type': new_row['type'], 'date_added': new_row['date_added']},

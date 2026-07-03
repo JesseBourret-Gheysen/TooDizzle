@@ -59,6 +59,11 @@
     }
     .nav-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-light); border-color: rgba(224,234,248,0.35); }
     .nav-btn.active { background: rgba(255,255,255,0.15); border-color: rgba(224,234,248,0.55); color: var(--text-light); font-weight: 600; }
+    .scan-btn { cursor: pointer; font-family: inherit; margin-left: auto; }
+    .scan-btn:disabled { opacity: 0.55; cursor: default; }
+    .scan-btn.spinning { animation: scan-spin 1s linear infinite; }
+    @keyframes scan-spin { to { transform: rotate(360deg); } }
+    .scan-status { align-self: center; font-size: 0.72rem; color: var(--muted-light); letter-spacing: 0.02em; }
 
     /* ── Header ──────────────────────────────────────────────────────── */
     header { margin-bottom: 1.75rem; }
@@ -167,6 +172,12 @@
     .type-art       { background: #fde8d0; color: #8a4a1a; border: 1px solid #f0c89a; }
     .type-events    { background: #d0eeec; color: #1a6b68; border: 1px solid #a0d8d4; }
     .subtype-badge  { background: #eef2fb; color: #4a6090; border: 1px solid #c8d4e8; font-size: 0.62rem; padding: 0.14rem 0.48rem; margin-left: 0.28rem; }
+    /* Instagram-enrichment status badge */
+    .ig-badge       { background: #fdeef5; color: #9c3a72; border: 1px solid #f0c8dc; font-size: 0.62rem; padding: 0.14rem 0.48rem; margin-left: 0.28rem; }
+    .ig-badge.ig-yes   { background: #d4edda; color: #1e5c30; border-color: #a8d4b4; }
+    .ig-badge.ig-error { background: #fdecea; color: #b03024; border-color: #f0b4ae; }
+    /* Enrichment-appended images inside expanded / detail views */
+    .task-expanded img, .sheet-content img { max-width: 100%; height: auto; border-radius: 10px; margin: 0.35rem 0; display: block; }
 
     /* ── Links ───────────────────────────────────────────────────────── */
     .task-link  { color: var(--btn); text-decoration: underline; word-break: break-all; }
@@ -326,6 +337,8 @@
   <nav>
     <a href="/" class="nav-btn">Add Task</a>
     <a href="/tasks" class="nav-btn active">View Tasks</a>
+    <button id="scan-btn" class="nav-btn scan-btn" type="button" title="Fetch &amp; OCR Instagram posts">⟳ Scan Instagram</button>
+    <span id="scan-status" class="scan-status"></span>
   </nav>
 
   <header>
@@ -401,6 +414,7 @@
             <td>
               <span class="badge type-{{ type_cls.get(todo.type, 'other') }}">{{ todo.type }}</span>
               {% if todo.subtype %}<span class="badge subtype-badge">{{ todo.subtype }}</span>{% endif %}
+              {% if todo.is_instagram %}<span class="badge ig-badge ig-{{ todo.enriched or 'pending' }}" title="Instagram — {{ 'enriched' if todo.enriched == 'yes' else ('enrichment error' if todo.enriched == 'error' else 'not yet enriched') }}">📷 {{ '✓' if todo.enriched == 'yes' else ('!' if todo.enriched == 'error' else '…') }}</span>{% endif %}
             </td>
             <td class="col-source">
               {% if todo.source %}
@@ -438,6 +452,7 @@
           <div class="mobile-item-meta">
             <span class="badge type-{{ type_cls.get(todo.type, 'other') }}">{{ todo.type }}</span>
             {% if todo.subtype %}<span class="badge subtype-badge">{{ todo.subtype }}</span>{% endif %}
+            {% if todo.is_instagram %}<span class="badge ig-badge ig-{{ todo.enriched or 'pending' }}">📷 {{ '✓' if todo.enriched == 'yes' else ('!' if todo.enriched == 'error' else '…') }}</span>{% endif %}
             <span class="mobile-date">{{ todo.date_added }}</span>
           </div>
         </div>
@@ -858,6 +873,39 @@
       setTimeout(() => { sheetEl.style.transition = ''; }, 350);
     }
   }, { passive: true });
+
+  // ── Instagram scan ────────────────────────────────────────────────────
+  const scanBtn    = document.getElementById('scan-btn');
+  const scanStatus = document.getElementById('scan-status');
+  if (scanBtn) {
+    scanBtn.addEventListener('click', async () => {
+      scanBtn.disabled = true;
+      const original = scanBtn.textContent;
+      scanBtn.textContent = '⟳ Scanning…';
+      scanStatus.textContent = '';
+      try {
+        const res  = await fetch('/scan', { method: 'POST' });
+        const data = await res.json();
+        const n = data.queued || 0;
+        if (n > 0) {
+          // Enrichment runs on a background worker (network + OCR, a few
+          // seconds per post). Reload once it's had time to make progress;
+          // the 📷 badges flip to ✓ as rows finish.
+          scanStatus.textContent = `Enriching ${n} post${n === 1 ? '' : 's'} in the background…`;
+          setTimeout(() => location.reload(), Math.min(6000 + n * 1500, 30000));
+        } else {
+          scanStatus.textContent = 'Nothing new to enrich';
+          scanBtn.disabled = false;
+          scanBtn.textContent = original;
+          setTimeout(() => { scanStatus.textContent = ''; }, 4000);
+        }
+      } catch {
+        scanStatus.textContent = 'Scan failed';
+        scanBtn.disabled = false;
+        scanBtn.textContent = original;
+      }
+    });
+  }
 
   function navigateMobile(dir) {
     const visible = allMobileItems.filter(i => i.style.display !== 'none');
