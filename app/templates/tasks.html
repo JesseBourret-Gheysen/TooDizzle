@@ -369,6 +369,11 @@
       <button class="pill" data-type-filter="Events">Events</button>
       <button class="pill" data-type-filter="Other">Other</button>
     </div>
+    <div class="filter-group" id="subtype-filter-group">
+      <span class="filter-label">Subtype</span>
+      <button class="pill active" data-subtype-filter="all">All</button>
+      <!-- subtype pills injected by JS from the tasks' actual subtypes -->
+    </div>
     <div class="filter-group">
       <span class="filter-label">Status</span>
       <button class="pill" data-status-filter="all">All</button>
@@ -453,6 +458,7 @@
       {% for todo in todos %}
       <div class="mobile-item {{ 'is-done' if todo.done == 'yes' else '' }}"
            data-type="{{ todo.type }}"
+           data-subtype="{{ todo.subtype }}"
            data-done="{{ todo.done }}"
            data-date="{{ todo.date_added }}"
            data-id="{{ todo.id }}"
@@ -570,9 +576,10 @@
   // ── Filter / sort state ───────────────────────────────────────────────
   const allRows        = Array.from(document.querySelectorAll('tbody tr'));
   const allMobileItems = Array.from(document.querySelectorAll('.mobile-item'));
-  let activeType   = 'all';
-  let activeStatus = 'active';
-  let sortOrder    = 'newest';
+  let activeType    = 'all';
+  let activeSubtype = 'all';
+  let activeStatus  = 'active';
+  let sortOrder     = 'newest';
 
   function updateCount() {
     const visible = allRows.filter(r => r.style.display !== 'none');
@@ -584,11 +591,13 @@
   function applyFilters() {
     [allRows, allMobileItems].forEach(list => {
       list.forEach(el => {
-        const typeMatch   = activeType === 'all' || el.dataset.type === activeType;
-        const statusMatch = activeStatus === 'all'
+        const typeMatch    = activeType === 'all' || el.dataset.type === activeType;
+        const subtypeMatch = activeSubtype === 'all'
+          || (el.dataset.subtype || '').toLowerCase() === activeSubtype.toLowerCase();
+        const statusMatch  = activeStatus === 'all'
           || (activeStatus === 'active' && el.dataset.done !== 'yes')
           || (activeStatus === 'done'   && el.dataset.done === 'yes');
-        el.style.display = (typeMatch && statusMatch) ? '' : 'none';
+        el.style.display = (typeMatch && subtypeMatch && statusMatch) ? '' : 'none';
       });
     });
     updateCount();
@@ -620,6 +629,42 @@
       applyFilters();
     });
   });
+
+  // Subtype filter — pills are built from the subtypes actually present in the
+  // tasks, deduped case-insensitively (so Tech "Other" and Art "other" collapse
+  // into one pill). Preserve the cased variant for display (e.g. "AI", "Other").
+  (function buildSubtypeFilter() {
+    const group = document.getElementById('subtype-filter-group');
+    if (!group) return;
+    const seen = new Map();                       // lower-cased key -> display value
+    allRows.forEach(r => {
+      const s = (r.dataset.subtype || '').trim();
+      if (!s) return;
+      const key = s.toLowerCase();
+      const existing = seen.get(key);
+      // Prefer a variant containing an uppercase letter for display.
+      if (!existing || (existing === existing.toLowerCase() && s !== s.toLowerCase())) {
+        seen.set(key, s);
+      }
+    });
+    const values = [...seen.values()].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    if (!values.length) { group.style.display = 'none'; return; }
+    for (const val of values) {
+      const btn = document.createElement('button');
+      btn.className = 'pill';
+      btn.dataset.subtypeFilter = val;
+      btn.textContent = val;
+      group.appendChild(btn);
+    }
+    group.querySelectorAll('[data-subtype-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeSubtype = btn.dataset.subtypeFilter;
+        group.querySelectorAll('[data-subtype-filter]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyFilters();
+      });
+    });
+  })();
 
   // Status filter
   document.querySelectorAll('[data-status-filter]').forEach(btn => {
